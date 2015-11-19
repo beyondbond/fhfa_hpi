@@ -1,0 +1,48 @@
+#- Convert HPI/HPA from Quarterly to Monthly Data
+from table hpi_ofheo_hist to hpi_ofheo_montyly
+Usage of
+  zxy updHpiOfheoMonthly.egx 
+then run
+bcp hpi_ofheo_monthly in /apps/fafa/deals/EcoData/hpi_ofheo_monthly.bcp  -b 1000 -c -t, -Usfdbo -Psfdbo0 -SBBDB1 -e bcp.err
+--------------------------------------------------------#
+strnew[queryTemp,
+"use HPI;select region_type,region_code,pb_date as 'bmqDate',hpi_index as 'hpi' from hpi_ofheo_hist
+where
+region_type='$cbsa_type' and
+region_code='$cbsa_code'
+order by pb_date"
+];
+strasg[vstrA,GetDb, "/apps/fafa/bin/tsql.sh -dsn bbub1 -b"];
+#if(!exist(fpOut,1)) fpOut="/apps/fafa/deals/EcoData/hpi_ofheo_monthly.bcp"; #
+if(!exist(fpOut,1)) fpOut="/apps/fafa/webDir/pubWebData/FHFA/csv/hpi_ofheo_monthly.tsv";
+if(!exist(xCbsa,1)) strasg[xCbsa,"CN","USA"];
+
+xdu=strnew[(vstrA,2),"use HPI;select distinct concat(region_type,',',region_code) from hpi_ofheo_hist"];
+du=f2str(_vstx,"printf \"use HPI;select distinct concat(region_type,',',region_code) from hpi_ofheo_hist\" |/apps/fafa/bin/tsql.sh -dsn bbub1 -b",1,1);
+#fia[vstrA]; #
+renvec['_vstx','vxCbsa',1];
+nOfheoCode=vxCbsa;
+
+strasg[vstrA,GetDb, "/apps/fafa/bin/tsql.sh -dsn bbub1 -s '\t'"];
+
+jOfheoCode=0; while(jOfheoCode<nOfheoCode) {
+	du=split(xCbsa,(vxCbsa,jOfheoCode),",");
+	if(du>=2) {
+		xdu=findrpl(queryX,queryTemp,'$cbsa_type',(xCbsa,0));
+		xdu=findrpl(queryX,queryX,'$cbsa_code',(xCbsa,1));
+	}
+	xdu=strnew[(vstrA,2),queryX];
+	xdu=strnew[queryY,"printf \"",queryX,"\" |",(vstrA,1)];
+	du=f2str(_vstx,queryY,1,1);
+	_nvar=txt2vec(_strvec,_vstx,'\t');
+	#fia[vstrA,"|"]; #
+	del['_vstx','queryX'];
+	nbmQ=getvinfo(bmqDate);
+	bmQdate=adddate(adddate(int(bmqDate(0)/100)*100+1,-1,1),1,30,0,1);
+	macro[BmQ2M.egx];
+	strnew[xh,(vxCbsa,jOfheoCode),","];
+	strasg[_dlmrx,",",xh,"\n"];
+	#writvec[nbmM-1,1,vMdate,vMhpi,vMhpaYoY,vMhpaQoQ,10001.8,stdout,@(_dlmrx)]; #
+	writnvec[0,nbmM,vMdate,vMhpi,vMhpaYoY,vMhpaQoQ,10001.8,fpOut,@(_dlmrx)];
+	jOfheoCode=jOfheoCode+1;
+}

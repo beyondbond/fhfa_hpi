@@ -1,0 +1,5 @@
+if(strcomp(xGeoX,"nation") ){
+macro[x_hpiStudy.egx];
+} else {
+macro[x_hpi4gdp.egx];
+}

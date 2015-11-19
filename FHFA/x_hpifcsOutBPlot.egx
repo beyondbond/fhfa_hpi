@@ -1,0 +1,64 @@
+if(htmlFmt<0) {
+#	strasg[_dlmrx,' ','\t','\n']; #
+	strnew[mapType, xGeoX, "\t"];
+	if (strcomp(xGeoX,'sts') == 0) strnew[mapType, "state\t"];
+	if (strcomp(xGeoX,'reg') == 0) strnew[mapType, "division\t"];
+	if (strcomp(xGeoX,'nation') == 0) strnew[mapType, "country\t"];
+	strasg[_dlmrx,'\t',mapType,'\n'];
+} else {
+	strasg[_dlmrx,'</TD><TD>','<TR ALIGN=RIGHT><TD>','</TD></TR>\n'];
+}
+
+if(exist(fpOut,1)) {
+	if(cfsOut==1) {	
+		strnew[fpQoQ,fpOut];
+	} else if(cfsOut==2) {	
+		strnew[fpYoY,fpOut];
+	}
+	strnew[fpLvL,fpOut];
+} else {
+	strnew[fpQoQ,"hpiFcsQoQ.txt"];
+	strnew[fpYoY,"hpiFcsYoY.txt"];
+	strnew[fpLvL,"hpiFcsLvL.txt"];
+}
+mStart=clip(1,mStart,nvar);
+strnew[(_dlmrx,6),"hz"];
+initvec[0,99,1.02,_vfmtx];
+
+if(exist(fpQoQ,1)) {
+if(htmlFmt>0) { print["<TABLE ID=HpiFcsTbl BORDER=1>\n",-1.0,fpQoQ]; }
+strnew[_vdsrx, "HPA QoQ"];
+writvec[1,tqFcs,vDATE,2001.2,fpQoQ,@(_dlmrx,_vdsrx)];
+jlist=1;while(jlist<=mEnd) {
+	strnew[_vdsrx,(stList,jlist)];
+	writvec[jlist*tqFcs,tqFcs,hpaQoQ,_vfmtx,fpQoQ,@(_dlmrx,_vdsrx)];
+	jincr=((!jlist)?mStart:1); jlist=jlist+jincr;
+
+}
+if(htmlFmt>0) { print["</TABLE>\n",-1.0,fpQoQ]; }
+}
+
+if(exist(fpYoY,1)) {
+if(htmlFmt>0) { print["<TABLE ID=HpiFcsTbl BORDER=1>\n",-1.0,fpYoY]; }
+strnew[_vdsrx,"Date"];
+# writvec[1,tqFcs,vDATE,2001.2,fpYoY,@(_dlmrx,_vdsrx)]; #
+jlist=0;while(jlist<=mEnd) {
+ 	strnew[_vdsrx,(stList,jlist)];
+	writvec[jlist*tqFcs,tqFcs,hpaYoY,_vfmtx,fpYoY,@(_dlmrx,_vdsrx)];
+	jincr=((!jlist)?mStart:1); jlist=jlist+jincr;
+}
+if(htmlFmt>0) { print["</TABLE>\n",-1.0,fpYoY]; }
+}
+
+if(exist(fpLvL,1)) {
+if(htmlFmt>0) { print["<TABLE ID=HpiFcsTbl BORDER=1>\n",-1.0,fpLvL]; }
+strnew[_vdsrx,"Date"];
+# writvec[1,tqFcs,vDATE,2001.2,fpLvL,@(_dlmrx,_vdsrx)]; #
+jlist=0;while(jlist<=mEnd) {
+	strnew[_vdsrx,(stList,jlist)];
+	writvec[jlist*tqFcs,tqFcs,hpaLvL,_vfmtx,fpLvL,@(_dlmrx,_vdsrx)];
+	jincr=((!jlist)?mStart:1); jlist=jlist+jincr;
+}
+
+if(htmlFmt>0) { print["</TABLE>\n",-1.0,fpLvL]; }
+}

@@ -1,0 +1,35 @@
+#------------------------------------------------------------#
+# Last mod,
+# Ted, Sat Aug  1 00:49:23 EDT 2015
+#------------------------------------------------------------#
+
+#- 1. GET HPI from FHFA site
+hpiGet.R
+#- 2. LOAD HPIs into database
+hpiLoad.R
+#- 3. REGRESS & FORECAST HPIs
+#??? hpiRegr.R (TBA)
+hpiCsv.R (Current)
+zxy updHpiFcs.egx > csv/upd_hpi_fcs.tsv
+tsql.sh < hpi_fcs.my.sql
+
+#- 4. UPDATE Monthly HPIs & FORECASTs
+#??? hpiFcst.R (TBA)
+zxy updHpiOfheoMonthly.egx
+tsql.sh  < hpi_ofheo_monthly.my.sql
+
+Relevants 
+pb_date: use end-of-quarter date in yyyymmdd format
+DB: HPI
+
+Tables: 
+hpi_reg_raw, hpi_sts_raw, hpi_cbsa_raw (original csv data from FHFA)
+hpi_ofheo_hist (entire history + forecasts)
+hpi_ofheo_monthly (monthly conversion based on quarterly data in hpi_ofheo_hist)
+
+Intermediate files in csv folder:
+csv/upd_hpi_cbsa.txt.csv (produced by hpiCsv.R)
+csv/upd_hpi_sts.txt.csv (produced by hpiCsv.R)
+csv/upd_hpi_reg.txt.csv (produced by hpiCsv.R)
+csv/upd_hpi_fcs.tsv (produced by updHpiFcs.egx need inputs of upd_hpi_*.txt.csv)
+csv/hpi_ofheo_monthly.tsv (produced updHpiOfheoMonthly.egx) 

@@ -1,0 +1,90 @@
+#!/bin/sh -x
+#
+#- USAGE OF:
+#- updHpiOfheoHist.sh qqyy=4q11 
+#-
+#- need to ensure data is download from www.ofheo.gov site
+#- Note: for cbsa dataset in ofheo, 
+#-      download hpi_cbsa.csv and open EXCEL and then save it as text format into hpi_cbsa.txt
+
+prog=`basename ${0}`
+binDir=`dirname ${0}`
+curDir=`pwd`
+datDir=${binDir}/dat
+
+for arg in "$@"
+do
+        eval "$arg"
+done
+qqyy=${qqyy:=1q15}
+dbHost=${dbHost:=bbub1}
+
+
+cd $datDir
+
+#- get HPI data from OFHEO site
+wgetFlag=1
+if [ $wgetFlag -eq 1 ]; then
+echo "GET OFHEO HPI DATA"
+wget http://www.fhfa.gov/DataTools/Downloads/Documents/HPI/HPI_AT_us_and_census.csv -O hpi_reg.csv
+wget http://www.fhfa.gov/DataTools/Downloads/Documents/HPI/HPI_AT_state.csv -O hpi_sts.csv
+wget http://www.fhfa.gov/DataTools/Downloads/Documents/HPI/HPI_AT_metro.csv -O hpi_cbsa.csv
+fi
+
+#- update quarterly HPI data
+gawk -F, '{dt=30;if($3==1||$3==4){dt=dt+1;}printf("sts\t%s\t%s\t%s\t%s%02d%s\t%s\t%s\t\t%s\n",$1,$2,$3,$2,$3*3,dt,$4,"",$1);}' hpi_sts.csv > hpi_sts.bcp
+gawk -F, '{gsub("DV_","",$1);dt=30;if($3==1||$3==4){dt=dt+1;}printf("CN\t%s\t%s\t%s\t%s%02d%s\t%s\t%s\t\t%s\n",$1,$2,$3,$2,$3*3,dt,$4,"",$1);}' hpi_reg.csv > hpi_reg.bcp
+sed -f /apps/fafa/ppyUpd/hpihst/cbsa.sed hpi_cbsa.csv > hpi_cbsa.sem
+awk -F\; '{dt=30;if($4==1||$4==4)dt=31;printf("%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n","cbsa",$2,$3,$4,$3*10000+$4*300+dt,$5,$6,"0",$1);}' hpi_cbsa.sem > hpi_cbsa.bcp
+
+#isql.rsh -dsn BBDB1 < /apps/fafa/bbdb/hpi_ofheo_hist.sql
+#isql.rsh -dsn BBSQL < /apps/fafa/bbdb/hpi_ofheo_hist.sql
+GeoTypeList="reg sts cbsa"
+for  xGeoType in $GeoTypeList ; do
+bcp hpi_ofheo_hist in hpi_${xGeoType}.bcp  -b 1000 -c -t\\t -Usfdbo -Psfdbo0 -SBBDB1 -e bcp.err
+unix2dos hpi_${xGeoType}.bcp
+chmod 666 hpi_${xGeoType}.bcp
+#sed -e "s/_CsvName_/hpi_${xGeoType}.bcp/" -e "s/_TableName_/hpi_ofheo_hist/" /apps/fafa/ppyUpd/hpihst/bulkTmp.sql | tsql.sh -dsn BBSQL
+done
+
+#- update for ZXY script: x_hpiGrp.egx
+sed 's/,/\t/g' hpi_sts.csv > upd_hpi_sts.txt
+sed 's/,/\t/g' hpi_reg.csv > upd_hpi_reg.txt
+sed 's/;/\t/g' hpi_cbsa.sem > upd_hpi_cbsa.txt
+/apps/fafa/bin/zxy x_hpiGrp.egx 'fname="upd_hpi_reg.txt";'
+/apps/fafa/bin/zxy x_hpiGrp.egx 'fname="upd_hpi_sts.txt";'
+/apps/fafa/bin/zxy x_hpiGrp.egx 'fname="upd_hpi_cbsa.txt";'
+
+#- update quarterly HPI forecasts: x_hpiStudy.egx,updHpiFcs.egx
+/apps/fafa/bin/zxy updHpiFcs.egx > upd_hpi_fcs.bcp
+bcp hpi_ofheo_hist in upd_hpi_fcs.bcp  -b 1000 -c -t\\t -Usfdbo -Psfdbo0 -SBBDB1 -e bcp.err
+unix2dos upd_hpi_fcs.bcp
+chmod 666 upd_hpi_fcs.bcp
+sed -e "s/_CsvName_/upd_hpi_fcs.bcp/" -e "s/_TableName_/hpi_ofheo_hist/" ${binDir}/bulkMyTmp.sql | tsql.sh -dsn ${dbHost}
+
+#- update monthly HPI data history and forecasts
+zxy updHpiOfheoMonthly.egx
+#isql.rsh -dsn BBDB1 < /apps/fafa/bbdb/hpi_ofheo_monthly.sql
+bcp hpi_ofheo_monthly in hpi_ofheo_monthly.bcp  -b 1000 -c -t, -Usfdbo -Psfdbo0 -SBBDB1 -e bcp.err
+
+#isql.rsh -dsn BBSQL < /apps/fafa/bbdb/hpi_ofheo_monthly.sql
+unix2dos hpi_ofheo_monthly.bcp
+chmod 666 hpi_ofheo_monthly.bcp
+tsql.sh -dsn bbub1 < hpi_ofheo_monthly.mySql.sql
+
+#- update quarterly HPA history 
+#tsql.sh -dsn BBSQL < m2qUpd.sql
+#tsql.sh -dsn BBSQL < BmQ.sql >  /apps/fafa/ppyUpd/hpihst/BmQuarterly.ecd
+#tsql.sh -dsn BBSQL < BmM.sql >  /apps/fafa/ppyUpd/hpihst/BmMonthly.ecd
+
+
+
+
+#- update quarterly HPI raw data
+#unix2dos hpi_*.csv
+#chmod 666 hpi_*.csv
+#tsql.sh -dsn BBSQL < /apps/fafa/bbdb/hpi_ofheo_quar.sql
+#sed -e "s/_CsvName_/hpi_reg.csv/" -e "s/_TableName_/hpi_ofheo_dv/" /apps/fafa/ppyUpd/hpihst/bulkCsv.sql | tsql.sh -dsn BBSQL
+#sed -e "s/_CsvName_/hpi_sts.csv/" -e "s/_TableName_/hpi_ofheo_sts/" /apps/fafa/ppyUpd/hpihst/bulkCsv.sql | tsql.sh -dsn BBSQL
+# Not working because the dilimeter inside the quotes
+#sed -e "s/_CsvName_/hpi_cbsa.csv/" -e "s/_TableName_/hpi_ofheo_cbsa/" /apps/fafa/ppyUpd/hpihst/bulkCsv.sql | tsql.sh -dsn BBSQL

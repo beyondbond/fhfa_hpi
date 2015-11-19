@@ -1,0 +1,140 @@
+if(nqFcs<1) nqFcs=40; #- forecast term -#
+if(lbkPrd<0) lbkPrd=0; #- lookback period -#
+
+#strnew[dri,"/apps/fafa/deals/EcoData/"];#
+strnew[dri,"/apps/fafa/webDir/pubWebData/FHFA/csv/"];
+if(!exist(xSnamX,1))xSnamX="upd_hpi";
+if(!exist(xGeoX,1))xGeoX="sts";
+
+if(!fpi) { 
+	strnew[fpi    ,dri,xSnamX,"_reg",".txt.csv"];
+	strnew[(fpi,1),dri,xSnamX,"_",xGeoX,".txt.csv"];
+}
+
+loadvec[fpi,","]; 
+if(strcomp((fpi,0),(fpi,1))) {
+	loadvec[(fpi,1),","];
+} else {
+	_nvar=_nvar-1;
+}
+nb=_nobs;
+nvar=_nvar-1;
+renvec['_strvec','stList',1];
+renvec[United,USA];
+strnew[stList,'USA'];
+xLag=40;
+nobs=nb-xLag;
+setvec[0,nb+xLag+nqFcs,j,j,vNu];
+defvec[nb+nqFcs,dUsa,dSts];
+lbkPrd=clip(0,lbkPrd,nobs-1);
+tqFcs= nqFcs+lbkPrd;
+defvec[(nvar+1)*tqFcs,hpaLvL,hpaQoQ,hpaYoY];
+#- uDate=YYYYMMDD(nb-1-lbkPrd); -#
+uDate=adddate(adddate(int(YYYYMMDD(nb-1-lbkPrd)/100)*100+1,-1,1),1,30,0,1);
+du=datevec(uDate,tqFcs+1,90,0,eom=1,NULL,0,0,0,0,vDATE);
+
+mStart=clip(1,mStart,nvar);
+mEnd=((mEnd<1)?nvar:mEnd);
+mEnd=clip(mStart,mEnd,nvar);
+
+if(regOut==1) { fouterr[stdout,2]; }
+
+jlist=0;
+	grabvec[0,nb,(stList,jlist),vUsa];
+	setvec[1,nb-1,j,vUsa(j)-vUsa(j-1),dUsa];
+	grabvec[xLag-0,nobs,vUsa,vUsa_0];
+	grabvec[xLag-1,nobs,vUsa,vUsa_1];
+	grabvec[xLag-0,nobs,dUsa,dUsa_0];
+	grabvec[xLag-1,nobs,dUsa,dUsa_1];
+	grabvec[xLag-2,nobs,dUsa,dUsa_2];
+	grabvec[xLag,nobs,YYYYMMDD,vDate];
+
+	reg[0,nobs,1,dUsa_0,dUsa_1,dUsa_2];
+	renvec[_fit,dUsa_Fit];
+	setvec[0,nobs,j,dUsa_Fit(j)+vUsa_1(j),vUsa_Fit];
+	copyvec[dUsa_0,dUsa_Fcs];
+	copyvec[vUsa_0,vUsa_Fcs];
+	setloop[nobs,nqFcs,j,
+		dUsa_1(j)=dUsa_Fcs(j-1),
+		dUsa_2(j)=dUsa_Fcs(j-2),
+		dUsa_Fcs(j)=
+		_coef(0)*dUsa_1(j)+
+		_coef(1)*dUsa_2(j)+
+		_coef(2),
+		vUsa_Fcs(j)=dUsa_Fcs(j)+vUsa_Fcs(j-1),
+		dUsa_0(j)= dUsa_Fcs(j),
+		vUsa_0(j)= vUsa_Fcs(j)
+	];
+
+	#- setup scenario - #
+	if(exist(hpaSftX,1)) {
+		du=explode(xdu,hpaSftX,",");
+		if(atof(xdu)<100) {
+			setvec[0,du,j,atof((xdu,j)),vhpaSft];
+			setvec[du,max2(nqFcs-du,0),j,vhpaSft(du-1),vhpaSft];
+			setvec[nobs,nqFcs,j,vUsa_Fcs(j-1)*(1+vhpaSft(j-nobs)/100),vUsa_Fcs];
+		}
+	} else {
+		setloop[nobs,8,j,vUsa_Fcs(j)=vUsa_Fcs(j-1)*(1-.1/8)];
+		setloop[nobs+8,nqFcs-8,j,vUsa_Fcs(j)=vUsa_Fcs(j-1)];
+	}
+	setvec[nobs,nqFcs,j,vUsa_Fcs(j)-vUsa_Fcs(j-1),dUsa_Fcs];
+
+	setloop[0,tqFcs,j,
+		hpaLvL(jlist*tqFcs+j)=vUsa_Fcs(j+nobs-lbkPrd),
+		hpaQoQ(jlist*tqFcs+j)=(vUsa_Fcs(j+nobs-lbkPrd)/vUsa_Fcs(j+nobs-lbkPrd-1)-1)*100,
+		hpaYoY(jlist*tqFcs+j)=(vUsa_Fcs(j+nobs-lbkPrd)/vUsa_Fcs(j+nobs-lbkPrd-4)-1)*100];
+	
+jlist=mStart;while(jlist<=mEnd) {
+	grabvec[0,nb,(stList,jlist),vSts];
+	setvec[1,nb-1,j,vSts(j)-vSts(j-1),dSts];
+	grabvec[xLag-0,nobs,vSts,vSts_0];
+	grabvec[xLag-1,nobs,vSts,vSts_1];
+	grabvec[xLag-0,nobs,dSts,dSts_0];
+	grabvec[xLag-1,nobs,dSts,dSts_1];
+	grabvec[xLag-2,nobs,dSts,dSts_2];
+
+	#- co-integration: 1st step -#
+	reg[0,nobs,1,vSts_1,vUsa_1];
+	renvec[_resid,dSts_Erc];
+	renvec[_coef,ercCoef];
+
+	#- ols w/ error correction: 2nd step -#
+	reg[0,nobs,1,dSts_0,dSts_1,dSts_2,dSts_Erc];
+	renvec[_fit,dSts_Fit];
+	setvec[0,nobs,j,dSts_Fit(j)+vSts_1(j),vSts_Fit];
+	copyvec[dSts_0,dSts_Fcs];
+	copyvec[vSts_0,vSts_Fcs];
+	setvec[0,nobs,j,vSts_Fcs(j)-ercCoef(0)*vUsa_Fcs(j)-ercCoef(1),dSts_Erc_Fcs];
+	setloop[nobs,nqFcs,j,
+		du=-ercCoef(0)*vUsa_Fcs(j)-ercCoef(1),
+		vSts_Fcs(j)=
+		(vSts_Fcs(j-1)+
+		_coef(0)*dSts_Fcs(j-1)+
+		_coef(1)*dSts_Fcs(j-2)+
+		_coef(2)*du+
+		_coef(3))/(1-_coef(2)),
+		dSts_Fcs(j)=vSts_Fcs(j)-vSts_Fcs(j-1),
+		dSts_Erc_Fcs(j)=vSts_Fcs(j)-ercCoef(0)*vUsa_Fcs(j)-ercCoef(1),
+		dSts_0(j)= dSts_Fcs(j),
+		vSts_0(j)= vSts_Fcs(j)
+	];
+
+#-
+	gplot[nobs,nqFcs,vNu,vUsa_Fcs,vSts_Fcs];
+	gplot[nobs,nqFcs,vNu,dUsa_Fcs,dSts_Fcs];
+-#
+	setloop[0,tqFcs,j,
+		hpaLvL(jlist*tqFcs+j)=vSts_Fcs(j+nobs-lbkPrd),
+		hpaQoQ(jlist*tqFcs+j)=(vSts_Fcs(j+nobs-lbkPrd)/vSts_Fcs(j+nobs-lbkPrd-1)-1)*100,
+		hpaYoY(jlist*tqFcs+j)=(vSts_Fcs(j+nobs-lbkPrd)/vSts_Fcs(j+nobs-lbkPrd-4)-1)*100];
+
+	jlist=1+jlist;
+}
+# moved to output x_hpifcsOut10.egx
+if(!strcomp(xGeoX,"cbsa")&& !cbsaCodeUsed) {
+	du=implode(xList,(_strvec,1),"','");
+	du=f2str((stList,1),"/apps/fafa/bin/zxy cbsa2name.egx",1,1);
+}
+#
+fouterr[stderr,2];

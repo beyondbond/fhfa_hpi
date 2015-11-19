@@ -1,0 +1,18 @@
+mStart=clip(1,mStart,nvar);
+initvec[0,99,1.00,_vfmtx];
+setvec[0,tqFcs,j,int(vDATE(j+1)/10000),vYr];
+setvec[0,tqFcs,j,int(mod(vDATE(j+1),10000)/100)/3,vQr];
+assignv[0,99,_vfmtx,1,1,1,1.04,1.04,1.04];
+jlist=(!strcomp(xGeoX,"reg"))?0:1;
+while(jlist<=mEnd) {
+	if(!jlist) {
+		strnew[xdu,"CN","\t",(stList,jlist),"\t"];
+	} else if(!strcomp(xGeoX,"reg")) {
+		strnew[xdu,"DV","\t",(stList,jlist),"\t"];
+	} else {
+		strnew[xdu,xGeoX,"\t",(stList,jlist),"\t"];
+	}
+	strasg[_dlmrx,"\t",xdu,"\n"];
+	writnvec[0,tqFcs,vYr,vQr,(vDATE,1),(hpaLvL,jlist*tqFcs),(hpaQoQ,jlist*tqFcs),(hpaYoY,jlist*tqFcs),_vfmtx,stdout,@(_dlmrx)];
+	jincr=((!jlist)?mStart:1); jlist=jlist+jincr;
+}

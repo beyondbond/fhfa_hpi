@@ -1,0 +1,11 @@
+if(!exist(runFlag))runFlag=1;
+if(!exist(nqFcs))nqFcs=12;
+if(!exist(lbkPrd))lbkPrd=2;
+if(!exist(xSnamX,1))strnew[xSnamX,"upd_hpi"];
+if(!exist(cfsOut))cfsOut=1;
+if(!exist(hpaSftX,1)) strnew[hpaSftX,"-3.00,-2.05,-1.73,-1.42,-1.35,-0.81,-.66,0.22,0.56,0.75,0.84,0.88"];
+if(!exist(xGeoX,1))xGeoX="sts";
+if(!exist(xBgmap,1))xBgmap="continentalusa";
+
+cTitle="US OFHEO HPI Projection";
+subTitle="Preliminary - Internal Use Only";
